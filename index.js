@@ -1,13 +1,18 @@
 
+/* =========================================================
+   GAME EDUKASI
+   KUIS GERAKAN TUBUH
+   ========================================================= */
+
 import {
   PoseLandmarker,
   FilesetResolver
 } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs";
 
 
-/* ======================================================
-   ELEMENT
-====================================================== */
+/* =========================================================
+   ELEMENT HTML
+   ========================================================= */
 
 const menuScreen =
   document.getElementById("menuScreen");
@@ -94,9 +99,9 @@ const backMenu =
   document.getElementById("backMenu");
 
 
-/* ======================================================
-   SOAL
-====================================================== */
+/* =========================================================
+   BANK SOAL
+   ========================================================= */
 
 const questionBank = {
 
@@ -352,9 +357,9 @@ const questionBank = {
 };
 
 
-/* ======================================================
+/* =========================================================
    NAMA MATERI
-====================================================== */
+   ========================================================= */
 
 const materialNames = {
 
@@ -367,9 +372,9 @@ const materialNames = {
 };
 
 
-/* ======================================================
+/* =========================================================
    GAME STATE
-====================================================== */
+   ========================================================= */
 
 let selectedMaterialType = null;
 
@@ -390,9 +395,9 @@ let waitingForCenter = false;
 let gameRunning = false;
 
 
-/* ======================================================
+/* =========================================================
    CAMERA STATE
-====================================================== */
+   ========================================================= */
 
 let stream = null;
 
@@ -409,26 +414,25 @@ let facingMode = "user";
 let mirrorEnabled = true;
 
 
-/* ======================================================
-   POSITION STATE
-====================================================== */
+/* =========================================================
+   DETECTION STATE
+   ========================================================= */
 
 /*
-  Posisi tubuh tidak lagi menggunakan baseline
-  sebagai satu-satunya acuan.
+   ZONA GERAKAN
 
-  Sistem menggunakan posisi horizontal tubuh
-  pada frame kamera.
-
-  Pembagian:
-
-  0% -------- 36% -------- 57% -------- 100%
+   0% -------- 36% -------- 57% -------- 100%
 
       KIRI       TENGAH        KANAN
 
-  KIRI  : 0.00 - 0.36
-  TENGAH: 0.36 - 0.57
-  KANAN : 0.57 - 1.00
+   KIRI
+   0.00 - 0.36
+
+   TENGAH
+   0.36 - 0.57
+
+   KANAN
+   0.57 - 1.00
 */
 
 const LEFT_LIMIT = 0.36;
@@ -437,34 +441,50 @@ const RIGHT_LIMIT = 0.57;
 
 
 /*
-  Smoothing.
-
-  Semakin besar nilainya,
-  semakin cepat mengikuti gerakan.
-
-  0.25 = cukup stabil.
+   Smoothing dibuat lebih cepat
+   agar gerakan tidak terasa lambat.
 */
 
-const POSITION_SMOOTHING = 0.25;
+const POSITION_SMOOTHING = 0.35;
 
 
 /*
-  Untuk mencegah perubahan arah
-  akibat sedikit getaran.
+   Hanya perlu 2 pembacaan
+   agar tidak mudah berubah
+   karena noise kamera.
 */
 
 const DIRECTION_CONFIRM_FRAMES = 2;
 
 
 /*
-  Posisi tubuh yang sudah dihaluskan.
+   Jeda deteksi.
+*/
+
+const DETECTION_INTERVAL = 70;
+
+
+/*
+   Posisi tubuh hasil smoothing.
 */
 
 let smoothedX = null;
 
 
 /*
-  Arah yang sedang terdeteksi.
+   Arah yang sedang aktif.
+
+   PENTING:
+   Variabel ini sebelumnya hilang
+   pada kode kamu.
+*/
+
+let currentDirection = "TENGAH";
+
+
+/*
+   Arah yang sedang menunggu
+   konfirmasi.
 */
 
 let pendingDirection = "TENGAH";
@@ -473,25 +493,23 @@ let pendingDirectionFrames = 0;
 
 
 /*
-  Posisi tengah saat pemain harus
-  kembali ke tengah setelah menjawab.
+   ID timer untuk perpindahan soal.
 */
 
-const CENTER_MIN = 0.36;
-
-const CENTER_MAX = 0.57;
+let nextQuestionTimer = null;
 
 
 /*
-  Interval deteksi.
+   Untuk mendeteksi apakah tubuh
+   sedang benar-benar terlihat.
 */
 
-const DETECTION_INTERVAL = 100;
+let lastPoseDetected = false;
 
 
-/* ======================================================
+/* =========================================================
    PILIH MATERI
-====================================================== */
+   ========================================================= */
 
 materialButtons.forEach(button => {
 
@@ -532,9 +550,9 @@ materialButtons.forEach(button => {
 });
 
 
-/* ======================================================
+/* =========================================================
    SHUFFLE
-====================================================== */
+   ========================================================= */
 
 function shuffle(array) {
 
@@ -571,9 +589,9 @@ function shuffle(array) {
 }
 
 
-/* ======================================================
-   AMBIL 10 SOAL
-====================================================== */
+/* =========================================================
+   SIAPKAN SOAL
+   ========================================================= */
 
 function prepareQuestions() {
 
@@ -584,14 +602,17 @@ function prepareQuestions() {
 
 
   currentQuestions =
-    shuffle(bank).slice(0, 10);
+    shuffle(bank).slice(
+      0,
+      10
+    );
 
 }
 
 
-/* ======================================================
+/* =========================================================
    START CAMERA
-====================================================== */
+   ========================================================= */
 
 async function startCamera() {
 
@@ -613,6 +634,10 @@ async function startCamera() {
     }
 
 
+    /*
+       Matikan kamera lama.
+    */
+
     if (stream) {
 
       stream
@@ -628,6 +653,10 @@ async function startCamera() {
 
     cameraReady = false;
 
+
+    /*
+       Buka kamera.
+    */
 
     stream =
       await navigator.mediaDevices
@@ -645,6 +674,11 @@ async function startCamera() {
 
             height: {
               ideal: 480
+            },
+
+            frameRate: {
+              ideal: 30,
+              max: 30
             }
 
           },
@@ -658,6 +692,33 @@ async function startCamera() {
       stream;
 
 
+    /*
+       Tunggu metadata video.
+    */
+
+    await new Promise(resolve => {
+
+      if (
+        video.readyState >= 2
+      ) {
+
+        resolve();
+
+        return;
+
+      }
+
+
+      video.onloadedmetadata =
+        () => {
+
+          resolve();
+
+        };
+
+    });
+
+
     await video.play();
 
 
@@ -668,14 +729,20 @@ async function startCamera() {
 
 
     statusElement.textContent =
-      "🟢 Kamera aktif";
+      "🟢 Kamera aktif — mencari tubuh...";
 
 
     return true;
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Camera error:",
+      error
+    );
+
+
+    cameraReady = false;
 
 
     statusElement.textContent =
@@ -698,9 +765,9 @@ async function startCamera() {
 }
 
 
-/* ======================================================
+/* =========================================================
    CAMERA CONTROLS
-====================================================== */
+   ========================================================= */
 
 function updateCameraControls() {
 
@@ -740,9 +807,9 @@ function updateCameraControls() {
 }
 
 
-/* ======================================================
+/* =========================================================
    SWITCH CAMERA
-====================================================== */
+   ========================================================= */
 
 switchCamera.addEventListener(
   "click",
@@ -785,9 +852,9 @@ switchCamera.addEventListener(
 );
 
 
-/* ======================================================
+/* =========================================================
    TOGGLE MIRROR
-====================================================== */
+   ========================================================= */
 
 toggleMirror.addEventListener(
   "click",
@@ -799,13 +866,21 @@ toggleMirror.addEventListener(
 
     updateCameraControls();
 
+
+    /*
+       Reset pembacaan posisi
+       setelah mirror berubah.
+    */
+
+    resetPositionTracking();
+
   }
 );
 
 
-/* ======================================================
+/* =========================================================
    LOAD MEDIAPIPE
-====================================================== */
+   ========================================================= */
 
 async function loadPoseLandmarker() {
 
@@ -845,15 +920,15 @@ async function loadPoseLandmarker() {
 
 
             minPoseDetectionConfidence:
-              0.5,
+              0.45,
 
 
             minPosePresenceConfidence:
-              0.5,
+              0.45,
 
 
             minTrackingConfidence:
-              0.5
+              0.45
 
           }
         );
@@ -867,7 +942,10 @@ async function loadPoseLandmarker() {
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "MediaPipe error:",
+      error
+    );
 
 
     statusElement.textContent =
@@ -887,9 +965,9 @@ async function loadPoseLandmarker() {
 }
 
 
-/* ======================================================
+/* =========================================================
    COUNTDOWN
-====================================================== */
+   ========================================================= */
 
 async function startCountdown() {
 
@@ -946,32 +1024,56 @@ async function startCountdown() {
 }
 
 
-/* ======================================================
+/* =========================================================
    RESET POSITION TRACKING
-====================================================== */
+   ========================================================= */
 
 function resetPositionTracking() {
 
   smoothedX = null;
 
+
+  currentDirection =
+    "TENGAH";
+
+
   pendingDirection =
     "TENGAH";
+
 
   pendingDirectionFrames =
     0;
 
+
+  lastPoseDetected =
+    false;
+
+
+  if (nextQuestionTimer) {
+
+    clearTimeout(
+      nextQuestionTimer
+    );
+
+    nextQuestionTimer =
+      null;
+
+  }
+
+
   directionElement.textContent =
     "TENGAH";
 
+
   playerStatus.textContent =
-    "🧍 Menentukan posisi tengah";
+    "🧍 Menentukan posisi tubuh";
 
 }
 
 
-/* ======================================================
+/* =========================================================
    START NEW GAME
-====================================================== */
+   ========================================================= */
 
 function startNewGame() {
 
@@ -981,11 +1083,14 @@ function startNewGame() {
   currentQuestionIndex =
     0;
 
+
   score =
     0;
 
+
   correctAnswers =
     0;
+
 
   wrongAnswers =
     0;
@@ -994,8 +1099,10 @@ function startNewGame() {
   answerLocked =
     false;
 
+
   waitingForCenter =
     false;
+
 
   gameRunning =
     true;
@@ -1015,7 +1122,7 @@ function startNewGame() {
 
 
   feedback.textContent =
-    "Bersiap...";
+    "Gerakkan tubuh untuk menjawab";
 
 
   feedback.className =
@@ -1026,14 +1133,14 @@ function startNewGame() {
 
 
   statusElement.textContent =
-    "🟢 Game dimulai";
+    "🟢 Game aktif — gerakkan tubuh";
 
 }
 
 
-/* ======================================================
+/* =========================================================
    SHOW QUESTION
-====================================================== */
+   ========================================================= */
 
 function showQuestion() {
 
@@ -1051,6 +1158,7 @@ function showQuestion() {
 
   answerLocked =
     false;
+
 
   waitingForCenter =
     false;
@@ -1105,14 +1213,14 @@ function showQuestion() {
 
 
   playerStatus.textContent =
-    "🧍 Siap menjawab";
+    "🧍 Berdiri di area tengah";
 
 }
 
 
-/* ======================================================
+/* =========================================================
    HANDLE ANSWER
-====================================================== */
+   ========================================================= */
 
 function handleAnswer(userAnswer) {
 
@@ -1193,11 +1301,16 @@ function handleAnswer(userAnswer) {
 }
 
 
-/* ======================================================
+/* =========================================================
    NEXT QUESTION
-====================================================== */
+   ========================================================= */
 
 function nextQuestion() {
+
+  if (!gameRunning) {
+    return;
+  }
+
 
   currentQuestionIndex++;
 
@@ -1219,55 +1332,58 @@ function nextQuestion() {
 }
 
 
-/* ======================================================
+/* =========================================================
    GET BODY CENTER
-====================================================== */
+   ========================================================= */
+
+/*
+   Kita menggunakan bahu + pinggul.
+
+   Landmark:
+   11 = bahu kiri
+   12 = bahu kanan
+   23 = pinggul kiri
+   24 = pinggul kanan
+
+   Jika salah satu landmark tidak terbaca,
+   landmark yang tersedia tetap digunakan.
+*/
 
 function getBodyCenter(landmarks) {
 
-  /*
-    MediaPipe Pose:
+  if (
+    !landmarks ||
+    landmarks.length < 25
+  ) {
 
-    Bahu:
-    11 = left shoulder
-    12 = right shoulder
+    return null;
 
-    Pinggul:
-    23 = left hip
-    24 = right hip
-  */
-
-  const leftShoulder =
-    landmarks[11];
-
-  const rightShoulder =
-    landmarks[12];
-
-  const leftHip =
-    landmarks[23];
-
-  const rightHip =
-    landmarks[24];
+  }
 
 
   const points = [
-    leftShoulder,
-    rightShoulder,
-    leftHip,
-    rightHip
+
+    landmarks[11],
+
+    landmarks[12],
+
+    landmarks[23],
+
+    landmarks[24]
+
   ];
 
-
-  /*
-    Pastikan landmark
-    cukup terlihat.
-  */
 
   const validPoints =
     points.filter(
       point =>
         point &&
-        typeof point.x === "number"
+        typeof point.x === "number" &&
+        typeof point.visibility !== "number" ||
+        (
+          point &&
+          typeof point.x === "number"
+        )
     );
 
 
@@ -1280,33 +1396,104 @@ function getBodyCenter(landmarks) {
   }
 
 
-  let totalX = 0;
+  let totalX =
+    0;
+
+
+  let totalWeight =
+    0;
 
 
   validPoints.forEach(
     point => {
 
-      totalX += point.x;
+      /*
+         Jika visibility tersedia,
+         gunakan sebagai bobot.
+      */
+
+      const visibility =
+        typeof point.visibility === "number"
+          ? point.visibility
+          : 1;
+
+
+      const weight =
+        Math.max(
+          0.1,
+          Math.min(
+            1,
+            visibility
+          )
+        );
+
+
+      totalX +=
+        point.x *
+        weight;
+
+
+      totalWeight +=
+        weight;
 
     }
   );
 
 
+  if (
+    totalWeight <= 0
+  ) {
+
+    return null;
+
+  }
+
+
   return (
     totalX /
-    validPoints.length
+    totalWeight
   );
 
 }
 
 
-/* ======================================================
+/* =========================================================
    SMOOTH POSITION
-====================================================== */
+   ========================================================= */
 
 function smoothPosition(x) {
 
-  if (smoothedX === null) {
+  if (
+    typeof x !== "number" ||
+    !Number.isFinite(x)
+  ) {
+
+    return null;
+
+  }
+
+
+  /*
+     Batasi koordinat.
+  */
+
+  x =
+    Math.max(
+      0,
+      Math.min(
+        1,
+        x
+      )
+    );
+
+
+  /*
+     Pembacaan pertama langsung digunakan.
+  */
+
+  if (
+    smoothedX === null
+  ) {
 
     smoothedX =
       x;
@@ -1315,6 +1502,10 @@ function smoothPosition(x) {
 
   }
 
+
+  /*
+     Exponential smoothing.
+  */
 
   smoothedX =
     smoothedX +
@@ -1330,22 +1521,28 @@ function smoothPosition(x) {
 }
 
 
-/* ======================================================
-   DETERMINE DIRECTION
-====================================================== */
+/* =========================================================
+   GET DIRECTION
+   ========================================================= */
 
 function getDirection(x) {
 
+  if (
+    typeof x !== "number"
+  ) {
+
+    return "TENGAH";
+
+  }
+
+
   /*
-    Jika mirror aktif,
-    koordinat dibalik agar
-    arah layar tetap sesuai.
+     MediaPipe menggunakan koordinat
+     dari kiri ke kanan.
 
-    Setelah mirror:
-
-    kiri layar  = KIRI
-    tengah      = TENGAH
-    kanan layar = KANAN
+     Jika tampilan video mirror,
+     kita balik koordinat agar arah
+     sesuai dengan yang terlihat pemain.
   */
 
   const screenX =
@@ -1355,16 +1552,7 @@ function getDirection(x) {
 
 
   /*
-    PEMBAGIAN BARU
-
-    0.00 - 0.36
-    = KIRI
-
-    0.36 - 0.57
-    = TENGAH
-
-    0.57 - 1.00
-    = KANAN
+     KIRI
   */
 
   if (
@@ -1377,6 +1565,10 @@ function getDirection(x) {
   }
 
 
+  /*
+     KANAN
+  */
+
   if (
     screenX >
     RIGHT_LIMIT
@@ -1387,22 +1579,27 @@ function getDirection(x) {
   }
 
 
+  /*
+     Selain itu = tengah.
+  */
+
   return "TENGAH";
 
 }
 
 
-/* ======================================================
-   STABILIZE DIRECTION
-====================================================== */
+/* =========================================================
+   STABILKAN ARAH
+   ========================================================= */
 
 function getStableDirection(
   newDirection
 ) {
 
   /*
-    Jika sama dengan arah
-    sebelumnya, tambah counter.
+     Jika arah sama dengan arah
+     yang sedang menunggu,
+     tambah jumlah frame.
   */
 
   if (
@@ -1417,6 +1614,7 @@ function getStableDirection(
     pendingDirection =
       newDirection;
 
+
     pendingDirectionFrames =
       1;
 
@@ -1424,16 +1622,30 @@ function getStableDirection(
 
 
   /*
-    Tunggu beberapa frame
-    sebelum menganggap arah valid.
+     Belum cukup stabil.
   */
 
   if (
-    pendingDirectionFrames >=
+    pendingDirectionFrames <
     DIRECTION_CONFIRM_FRAMES
   ) {
 
-    return pendingDirection;
+    return currentDirection;
+
+  }
+
+
+  /*
+     Arah sudah dikonfirmasi.
+  */
+
+  if (
+    currentDirection !==
+    pendingDirection
+  ) {
+
+    currentDirection =
+      pendingDirection;
 
   }
 
@@ -1443,17 +1655,16 @@ function getStableDirection(
 }
 
 
-/* ======================================================
+/* =========================================================
    UPDATE DIRECTION
-====================================================== */
+   ========================================================= */
 
 function updateDirection(
   rawCenterX
 ) {
 
   if (
-    typeof rawCenterX !==
-    "number"
+    typeof rawCenterX !== "number"
   ) {
 
     return;
@@ -1462,7 +1673,7 @@ function updateDirection(
 
 
   /*
-    Haluskan posisi.
+     Haluskan posisi.
   */
 
   const smoothX =
@@ -1471,8 +1682,17 @@ function updateDirection(
     );
 
 
+  if (
+    smoothX === null
+  ) {
+
+    return;
+
+  }
+
+
   /*
-    Tentukan arah.
+     Tentukan zona.
   */
 
   const detectedDirection =
@@ -1482,7 +1702,7 @@ function updateDirection(
 
 
   /*
-    Stabilkan arah.
+     Stabilkan.
   */
 
   const newDirection =
@@ -1492,21 +1712,16 @@ function updateDirection(
 
 
   /*
-    Jangan lakukan apa-apa
-    kalau arah belum berubah.
+     Tampilkan arah.
   */
-
-  currentDirection =
-    newDirection;
-
 
   directionElement.textContent =
     newDirection;
 
 
-  /* =====================================
+  /*
      TENGAH
-  ====================================== */
+  */
 
   if (
     newDirection ===
@@ -1518,34 +1733,59 @@ function updateDirection(
     ) {
 
       playerStatus.textContent =
-        "🟢 Posisi tengah — siap";
+        "🟢 Sudah di tengah";
 
 
       waitingForCenter =
         false;
 
 
-      setTimeout(
-        () => {
+      /*
+         Tunggu sedikit agar
+         pemain benar-benar kembali
+         ke tengah sebelum soal berikutnya.
+      */
 
-          if (
-            gameRunning
-          ) {
+      if (
+        nextQuestionTimer
+      ) {
 
-            nextQuestion();
+        clearTimeout(
+          nextQuestionTimer
+        );
 
-          }
+      }
 
-        },
-        350
-      );
 
-    } else {
+      nextQuestionTimer =
+        setTimeout(
+          () => {
 
-      playerStatus.textContent =
-        "🧍 Posisi tengah";
+            nextQuestionTimer =
+              null;
+
+
+            if (
+              gameRunning &&
+              !answerLocked
+            ) {
+
+              nextQuestion();
+
+            }
+
+          },
+          400
+        );
+
+
+      return;
 
     }
+
+
+    playerStatus.textContent =
+      "🧍 Posisi tengah";
 
 
     return;
@@ -1553,9 +1793,10 @@ function updateDirection(
   }
 
 
-  /* =====================================
-     JAWABAN SUDAH DIKUNCI
-  ====================================== */
+  /*
+     Jika jawaban sudah dikunci,
+     jangan membaca jawaban baru.
+  */
 
   if (
     answerLocked
@@ -1566,9 +1807,9 @@ function updateDirection(
   }
 
 
-  /* =====================================
+  /*
      KANAN = BENAR
-  ====================================== */
+  */
 
   if (
     newDirection ===
@@ -1589,9 +1830,9 @@ function updateDirection(
   }
 
 
-  /* =====================================
+  /*
      KIRI = SALAH
-  ====================================== */
+  */
 
   if (
     newDirection ===
@@ -1611,22 +1852,31 @@ function updateDirection(
 }
 
 
-/* ======================================================
-   DETECTION LOOP
-====================================================== */
+/* =========================================================
+   POSE DETECTION
+   ========================================================= */
 
 function detectPose(
   timestamp
 ) {
 
+  /*
+     Loop harus terus berjalan.
+  */
+
+  requestAnimationFrame(
+    detectPose
+  );
+
+
+  /*
+     Sistem belum siap.
+  */
+
   if (
     !poseLandmarker ||
     !cameraReady
   ) {
-
-    requestAnimationFrame(
-      detectPose
-    );
 
     return;
 
@@ -1634,8 +1884,21 @@ function detectPose(
 
 
   /*
-    Batasi frekuensi deteksi
-    supaya tidak terlalu berat.
+     Video belum memiliki frame.
+  */
+
+  if (
+    video.readyState <
+    2
+  ) {
+
+    return;
+
+  }
+
+
+  /*
+     Batasi frekuensi deteksi.
   */
 
   if (
@@ -1644,36 +1907,19 @@ function detectPose(
     DETECTION_INTERVAL
   ) {
 
-    requestAnimationFrame(
-      detectPose
-    );
-
     return;
 
   }
 
+
+  /*
+     Jangan menjalankan dua deteksi
+     secara bersamaan.
+  */
 
   if (
     detectionBusy
   ) {
-
-    requestAnimationFrame(
-      detectPose
-    );
-
-    return;
-
-  }
-
-
-  if (
-    video.readyState <
-    2
-  ) {
-
-    requestAnimationFrame(
-      detectPose
-    );
 
     return;
 
@@ -1690,41 +1936,111 @@ function detectPose(
 
   try {
 
-    const result =
-      poseLandmarker
-        .detectForVideo(
-          video,
-          timestamp
-        );
+    /*
+       Jalankan MediaPipe.
+    */
 
+    const result =
+      poseLandmarker.detectForVideo(
+        video,
+        timestamp
+      );
+
+
+    /*
+       Tidak ada tubuh.
+    */
 
     if (
-      result &&
-      result.landmarks &&
-      result.landmarks.length > 0
+      !result ||
+      !result.landmarks ||
+      result.landmarks.length === 0
     ) {
 
-      const landmarks =
-        result.landmarks[0];
-
-
-      const centerX =
-        getBodyCenter(
-          landmarks
-        );
-
-
       if (
-        centerX !== null
+        lastPoseDetected
       ) {
 
-        updateDirection(
-          centerX
-        );
+        lastPoseDetected =
+          false;
+
+
+        directionElement.textContent =
+          "—";
+
+
+        playerStatus.textContent =
+          "🧍 Tubuh tidak terdeteksi";
+
+
+        statusElement.textContent =
+          "⚠️ Arahkan seluruh tubuh ke kamera";
 
       }
 
+
+      return;
+
     }
+
+
+    /*
+       Tubuh ditemukan.
+    */
+
+    lastPoseDetected =
+      true;
+
+
+    const landmarks =
+      result.landmarks[0];
+
+
+    const centerX =
+      getBodyCenter(
+        landmarks
+      );
+
+
+    if (
+      centerX === null
+    ) {
+
+      playerStatus.textContent =
+        "⚠️ Posisi tubuh belum jelas";
+
+
+      return;
+
+    }
+
+
+    /*
+       Tampilkan status deteksi.
+    */
+
+    if (
+      statusElement.textContent.includes(
+        "mencari tubuh"
+      ) ||
+      statusElement.textContent.includes(
+        "Arahkan"
+      )
+    ) {
+
+      statusElement.textContent =
+        "🟢 Tubuh terdeteksi";
+
+    }
+
+
+    /*
+       Masukkan posisi ke sistem arah.
+    */
+
+    updateDirection(
+      centerX
+    );
 
   } catch (error) {
 
@@ -1733,34 +2049,52 @@ function detectPose(
       error
     );
 
+
+    /*
+       Jangan hentikan loop
+       jika satu frame gagal.
+    */
+
+  } finally {
+
+    detectionBusy =
+      false;
+
   }
-
-
-  detectionBusy =
-    false;
-
-
-  requestAnimationFrame(
-    detectPose
-  );
 
 }
 
 
-/* ======================================================
+/* =========================================================
    END GAME
-====================================================== */
+   ========================================================= */
 
 function endGame() {
 
   gameRunning =
     false;
 
+
   answerLocked =
     true;
 
+
   waitingForCenter =
     false;
+
+
+  if (
+    nextQuestionTimer
+  ) {
+
+    clearTimeout(
+      nextQuestionTimer
+    );
+
+    nextQuestionTimer =
+      null;
+
+  }
 
 
   progressBar.style.width =
@@ -1805,19 +2139,23 @@ function endGame() {
 }
 
 
-/* ======================================================
+/* =========================================================
    STOP CAMERA
-====================================================== */
+   ========================================================= */
 
 function stopCamera() {
 
-  if (stream) {
+  if (
+    stream
+  ) {
 
     stream
       .getTracks()
-      .forEach(track => {
-        track.stop();
-      });
+      .forEach(
+        track => {
+          track.stop();
+        }
+      );
 
 
     stream =
@@ -1840,9 +2178,9 @@ function stopCamera() {
 }
 
 
-/* ======================================================
+/* =========================================================
    START GAME
-====================================================== */
+   ========================================================= */
 
 startGame.addEventListener(
   "click",
@@ -1872,16 +2210,20 @@ startGame.addEventListener(
 
 
     /*
-      MediaPipe.
+       Pastikan MediaPipe sudah siap.
     */
 
-    if (!poseLandmarker) {
+    if (
+      !poseLandmarker
+    ) {
 
       const loaded =
         await loadPoseLandmarker();
 
 
-      if (!loaded) {
+      if (
+        !loaded
+      ) {
 
         gameScreen.classList.remove(
           "active"
@@ -1905,14 +2247,16 @@ startGame.addEventListener(
 
 
     /*
-      Kamera.
+       Buka kamera.
     */
 
     const cameraStarted =
       await startCamera();
 
 
-    if (!cameraStarted) {
+    if (
+      !cameraStarted
+    ) {
 
       gameScreen.classList.remove(
         "active"
@@ -1934,23 +2278,41 @@ startGame.addEventListener(
 
 
     /*
-      Detection loop.
+       Reset posisi.
     */
 
-    requestAnimationFrame(
-      detectPose
-    );
+    resetPositionTracking();
 
 
     /*
-      Countdown.
+       Jalankan detection loop
+       hanya satu kali.
+    */
+
+    if (
+      !window.__poseLoopStarted
+    ) {
+
+      window.__poseLoopStarted =
+        true;
+
+
+      requestAnimationFrame(
+        detectPose
+      );
+
+    }
+
+
+    /*
+       Countdown.
     */
 
     await startCountdown();
 
 
     /*
-      Mulai game.
+       Mulai game.
     */
 
     startNewGame();
@@ -1963,9 +2325,9 @@ startGame.addEventListener(
 );
 
 
-/* ======================================================
+/* =========================================================
    MAIN LAGI
-====================================================== */
+   ========================================================= */
 
 playAgain.addEventListener(
   "click",
@@ -1987,17 +2349,22 @@ playAgain.addEventListener(
     answerLocked =
       false;
 
+
     waitingForCenter =
       false;
 
 
-    if (!cameraReady) {
+    if (
+      !cameraReady
+    ) {
 
       const started =
         await startCamera();
 
 
-      if (!started) {
+      if (
+        !started
+      ) {
 
         gameScreen.classList.remove(
           "active"
@@ -2025,9 +2392,9 @@ playAgain.addEventListener(
 );
 
 
-/* ======================================================
+/* =========================================================
    KEMBALI KE MENU
-====================================================== */
+   ========================================================= */
 
 backMenu.addEventListener(
   "click",
@@ -2084,9 +2451,9 @@ backMenu.addEventListener(
 );
 
 
-/* ======================================================
+/* =========================================================
    INITIAL STATE
-====================================================== */
+   ========================================================= */
 
 statusElement.textContent =
   "Sistem siap";
@@ -2103,9 +2470,9 @@ playerStatus.textContent =
 updateCameraControls();
 
 
-/* ======================================================
-   LOAD MEDIAPIPE
-====================================================== */
+/* =========================================================
+   INITIALIZE
+   ========================================================= */
 
 (async function initialize() {
 
@@ -2115,15 +2482,25 @@ updateCameraControls();
       "🧠 Menyiapkan sistem...";
 
 
-    await loadPoseLandmarker();
+    const loaded =
+      await loadPoseLandmarker();
 
 
-    statusElement.textContent =
-      "🟢 Sistem siap — pilih materi";
+    if (
+      loaded
+    ) {
+
+      statusElement.textContent =
+        "🟢 Sistem siap — pilih materi";
+
+    }
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Initialize error:",
+      error
+    );
 
 
     statusElement.textContent =
