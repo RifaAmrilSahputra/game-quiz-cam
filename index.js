@@ -1,12 +1,13 @@
+
 import {
   PoseLandmarker,
   FilesetResolver
 } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs";
 
 
-// ======================================================
-// ELEMENT
-// ======================================================
+/* ======================================================
+   ELEMENT
+====================================================== */
 
 const menuScreen =
   document.getElementById("menuScreen");
@@ -17,110 +18,85 @@ const gameScreen =
 const resultScreen =
   document.getElementById("resultScreen");
 
-
 const materialButtons =
   document.querySelectorAll(".material-btn");
-
 
 const selectedMaterial =
   document.getElementById("selectedMaterial");
 
-
 const startGame =
   document.getElementById("startGame");
-
 
 const materialTitle =
   document.getElementById("materialTitle");
 
-
 const scoreElement =
   document.getElementById("score");
-
 
 const questionNumber =
   document.getElementById("questionNumber");
 
-
 const progressBar =
   document.getElementById("progressBar");
-
 
 const progressPercent =
   document.getElementById("progressPercent");
 
-
 const questionElement =
   document.getElementById("question");
-
 
 const feedback =
   document.getElementById("feedback");
 
-
 const directionElement =
   document.getElementById("direction");
-
 
 const playerStatus =
   document.getElementById("playerStatus");
 
-
 const statusElement =
   document.getElementById("status");
-
 
 const video =
   document.getElementById("video");
 
-
 const canvas =
   document.getElementById("canvas");
-
 
 const switchCamera =
   document.getElementById("switchCamera");
 
-
 const toggleMirror =
   document.getElementById("toggleMirror");
-
 
 const countdown =
   document.getElementById("countdown");
 
-
 const countdownNumber =
   document.getElementById("countdownNumber");
-
 
 const resultMaterial =
   document.getElementById("resultMaterial");
 
-
 const finalScore =
   document.getElementById("finalScore");
-
 
 const correctCount =
   document.getElementById("correctCount");
 
-
 const wrongCount =
   document.getElementById("wrongCount");
 
-
 const playAgain =
   document.getElementById("playAgain");
-
 
 const backMenu =
   document.getElementById("backMenu");
 
 
-// ======================================================
-// SOAL
-// ======================================================
+/* ======================================================
+   SOAL
+====================================================== */
 
 const questionBank = {
 
@@ -376,9 +352,9 @@ const questionBank = {
 };
 
 
-// ======================================================
-// NAMA MATERI
-// ======================================================
+/* ======================================================
+   NAMA MATERI
+====================================================== */
 
 const materialNames = {
 
@@ -391,9 +367,9 @@ const materialNames = {
 };
 
 
-// ======================================================
-// GAME STATE
-// ======================================================
+/* ======================================================
+   GAME STATE
+====================================================== */
 
 let selectedMaterialType = null;
 
@@ -414,9 +390,9 @@ let waitingForCenter = false;
 let gameRunning = false;
 
 
-// ======================================================
-// CAMERA STATE
-// ======================================================
+/* ======================================================
+   CAMERA STATE
+====================================================== */
 
 let stream = null;
 
@@ -433,59 +409,138 @@ let facingMode = "user";
 let mirrorEnabled = true;
 
 
-// ======================================================
-// MOVEMENT STATE
-// ======================================================
+/* ======================================================
+   POSITION STATE
+====================================================== */
 
-let baselineX = null;
+/*
+  Posisi tubuh tidak lagi menggunakan baseline
+  sebagai satu-satunya acuan.
 
-let currentDirection = "TENGAH";
+  Sistem menggunakan posisi horizontal tubuh
+  pada frame kamera.
+
+  Pembagian:
+
+  0% -------- 36% -------- 57% -------- 100%
+
+      KIRI       TENGAH        KANAN
+
+  KIRI  : 0.00 - 0.36
+  TENGAH: 0.36 - 0.57
+  KANAN : 0.57 - 1.00
+*/
+
+const LEFT_LIMIT = 0.36;
+
+const RIGHT_LIMIT = 0.57;
 
 
-// Interval deteksi.
-// 125 ms = sekitar 8 deteksi per detik.
-const DETECTION_INTERVAL = 125;
+/*
+  Smoothing.
+
+  Semakin besar nilainya,
+  semakin cepat mengikuti gerakan.
+
+  0.25 = cukup stabil.
+*/
+
+const POSITION_SMOOTHING = 0.25;
 
 
-// Threshold gerakan.
-const MOVEMENT_THRESHOLD = 0.08;
+/*
+  Untuk mencegah perubahan arah
+  akibat sedikit getaran.
+*/
+
+const DIRECTION_CONFIRM_FRAMES = 2;
 
 
-// ======================================================
-// PILIH MATERI
-// ======================================================
+/*
+  Posisi tubuh yang sudah dihaluskan.
+*/
+
+let smoothedX = null;
+
+
+/*
+  Arah yang sedang terdeteksi.
+*/
+
+let pendingDirection = "TENGAH";
+
+let pendingDirectionFrames = 0;
+
+
+/*
+  Posisi tengah saat pemain harus
+  kembali ke tengah setelah menjawab.
+*/
+
+const CENTER_MIN = 0.36;
+
+const CENTER_MAX = 0.57;
+
+
+/*
+  Interval deteksi.
+*/
+
+const DETECTION_INTERVAL = 100;
+
+
+/* ======================================================
+   PILIH MATERI
+====================================================== */
 
 materialButtons.forEach(button => {
 
-  button.addEventListener("click", () => {
+  button.addEventListener(
+    "click",
+    () => {
 
-    materialButtons.forEach(btn => {
-      btn.classList.remove("selected");
-    });
+      materialButtons.forEach(btn => {
 
-    button.classList.add("selected");
+        btn.classList.remove(
+          "selected"
+        );
 
-    selectedMaterialType =
-      button.dataset.material;
+      });
 
-    selectedMaterial.textContent =
-      "Materi dipilih: " +
-      materialNames[selectedMaterialType];
 
-    startGame.disabled = false;
+      button.classList.add(
+        "selected"
+      );
 
-  });
+
+      selectedMaterialType =
+        button.dataset.material;
+
+
+      selectedMaterial.textContent =
+        "Materi dipilih: " +
+        materialNames[
+          selectedMaterialType
+        ];
+
+
+      startGame.disabled = false;
+
+    }
+  );
 
 });
 
 
-// ======================================================
-// SHUFFLE
-// ======================================================
+/* ======================================================
+   SHUFFLE
+====================================================== */
 
 function shuffle(array) {
 
-  const result = [...array];
+  const result =
+    [...array];
+
 
   for (
     let i = result.length - 1;
@@ -495,8 +550,10 @@ function shuffle(array) {
 
     const j =
       Math.floor(
-        Math.random() * (i + 1)
+        Math.random() *
+        (i + 1)
       );
+
 
     [
       result[i],
@@ -508,18 +565,23 @@ function shuffle(array) {
 
   }
 
+
   return result;
+
 }
 
 
-// ======================================================
-// AMBIL 10 SOAL
-// ======================================================
+/* ======================================================
+   AMBIL 10 SOAL
+====================================================== */
 
 function prepareQuestions() {
 
   const bank =
-    questionBank[selectedMaterialType];
+    questionBank[
+      selectedMaterialType
+    ];
+
 
   currentQuestions =
     shuffle(bank).slice(0, 10);
@@ -527,9 +589,9 @@ function prepareQuestions() {
 }
 
 
-// ======================================================
-// START CAMERA
-// ======================================================
+/* ======================================================
+   START CAMERA
+====================================================== */
 
 async function startCamera() {
 
@@ -539,8 +601,10 @@ async function startCamera() {
       "📷 Membuka kamera...";
 
 
-    if (!navigator.mediaDevices ||
-        !navigator.mediaDevices.getUserMedia) {
+    if (
+      !navigator.mediaDevices ||
+      !navigator.mediaDevices.getUserMedia
+    ) {
 
       throw new Error(
         "Browser tidak mendukung kamera."
@@ -549,7 +613,6 @@ async function startCamera() {
     }
 
 
-    // Hentikan stream lama sebelum meminta kamera yang lain.
     if (stream) {
 
       stream
@@ -567,30 +630,32 @@ async function startCamera() {
 
 
     stream =
-      await navigator.mediaDevices.getUserMedia({
+      await navigator.mediaDevices
+        .getUserMedia({
 
-        video: {
+          video: {
 
-          facingMode: {
-            ideal: facingMode
+            facingMode: {
+              ideal: facingMode
+            },
+
+            width: {
+              ideal: 640
+            },
+
+            height: {
+              ideal: 480
+            }
+
           },
 
-          width: {
-            ideal: 640
-          },
+          audio: false
 
-          height: {
-            ideal: 480
-          }
-
-        },
-
-        audio: false
-
-      });
+        });
 
 
-    video.srcObject = stream;
+    video.srcObject =
+      stream;
 
 
     await video.play();
@@ -633,9 +698,9 @@ async function startCamera() {
 }
 
 
-// ======================================================
-// CAMERA CONTROLS
-// ======================================================
+/* ======================================================
+   CAMERA CONTROLS
+====================================================== */
 
 function updateCameraControls() {
 
@@ -675,6 +740,10 @@ function updateCameraControls() {
 }
 
 
+/* ======================================================
+   SWITCH CAMERA
+====================================================== */
+
 switchCamera.addEventListener(
   "click",
   async () => {
@@ -690,18 +759,19 @@ switchCamera.addEventListener(
         : "user";
 
 
-    // Titik tengah perlu dibuat ulang setelah sumber kamera berubah.
-    baselineX = null;
+    resetPositionTracking();
 
 
-    switchCamera.disabled = true;
+    switchCamera.disabled =
+      true;
 
 
     const started =
       await startCamera();
 
 
-    switchCamera.disabled = false;
+    switchCamera.disabled =
+      false;
 
 
     if (!started) {
@@ -715,11 +785,17 @@ switchCamera.addEventListener(
 );
 
 
+/* ======================================================
+   TOGGLE MIRROR
+====================================================== */
+
 toggleMirror.addEventListener(
   "click",
   () => {
 
-    mirrorEnabled = !mirrorEnabled;
+    mirrorEnabled =
+      !mirrorEnabled;
+
 
     updateCameraControls();
 
@@ -727,9 +803,9 @@ toggleMirror.addEventListener(
 );
 
 
-// ======================================================
-// LOAD MEDIAPIPE
-// ======================================================
+/* ======================================================
+   LOAD MEDIAPIPE
+====================================================== */
 
 async function loadPoseLandmarker() {
 
@@ -740,45 +816,47 @@ async function loadPoseLandmarker() {
 
 
     const vision =
-      await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
-      );
+      await FilesetResolver
+        .forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
+        );
 
 
     poseLandmarker =
-      await PoseLandmarker.createFromOptions(
-        vision,
-        {
+      await PoseLandmarker
+        .createFromOptions(
+          vision,
+          {
 
-          baseOptions: {
+            baseOptions: {
 
-            modelAssetPath:
-              "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
+              modelAssetPath:
+                "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
 
-          },
-
-
-          runningMode:
-            "VIDEO",
+            },
 
 
-          numPoses:
-            1,
+            runningMode:
+              "VIDEO",
 
 
-          minPoseDetectionConfidence:
-            0.5,
+            numPoses:
+              1,
 
 
-          minPosePresenceConfidence:
-            0.5,
+            minPoseDetectionConfidence:
+              0.5,
 
 
-          minTrackingConfidence:
-            0.5
+            minPosePresenceConfidence:
+              0.5,
 
-        }
-      );
+
+            minTrackingConfidence:
+              0.5
+
+          }
+        );
 
 
     statusElement.textContent =
@@ -809,13 +887,15 @@ async function loadPoseLandmarker() {
 }
 
 
-// ======================================================
-// COUNTDOWN
-// ======================================================
+/* ======================================================
+   COUNTDOWN
+====================================================== */
 
 async function startCountdown() {
 
-  countdown.classList.add("show");
+  countdown.classList.add(
+    "show"
+  );
 
 
   const values = [
@@ -826,7 +906,9 @@ async function startCountdown() {
   ];
 
 
-  for (const value of values) {
+  for (
+    const value of values
+  ) {
 
     countdownNumber.textContent =
       value;
@@ -843,49 +925,83 @@ async function startCountdown() {
       "countdownPop 1s ease-in-out";
 
 
-    await new Promise(resolve => {
+    await new Promise(
+      resolve => {
 
-      setTimeout(
-        resolve,
-        1000
-      );
+        setTimeout(
+          resolve,
+          1000
+        );
 
-    });
+      }
+    );
 
   }
 
 
-  countdown.classList.remove("show");
+  countdown.classList.remove(
+    "show"
+  );
 
 }
 
 
-// ======================================================
-// START NEW GAME
-// ======================================================
+/* ======================================================
+   RESET POSITION TRACKING
+====================================================== */
+
+function resetPositionTracking() {
+
+  smoothedX = null;
+
+  pendingDirection =
+    "TENGAH";
+
+  pendingDirectionFrames =
+    0;
+
+  directionElement.textContent =
+    "TENGAH";
+
+  playerStatus.textContent =
+    "🧍 Menentukan posisi tengah";
+
+}
+
+
+/* ======================================================
+   START NEW GAME
+====================================================== */
 
 function startNewGame() {
 
   prepareQuestions();
 
 
-  currentQuestionIndex = 0;
+  currentQuestionIndex =
+    0;
 
-  score = 0;
+  score =
+    0;
 
-  correctAnswers = 0;
+  correctAnswers =
+    0;
 
-  wrongAnswers = 0;
-
-
-  answerLocked = false;
-
-  waitingForCenter = false;
-
-  gameRunning = true;
+  wrongAnswers =
+    0;
 
 
-  baselineX = null;
+  answerLocked =
+    false;
+
+  waitingForCenter =
+    false;
+
+  gameRunning =
+    true;
+
+
+  resetPositionTracking();
 
 
   scoreElement.textContent =
@@ -893,7 +1009,9 @@ function startNewGame() {
 
 
   materialTitle.textContent =
-    materialNames[selectedMaterialType];
+    materialNames[
+      selectedMaterialType
+    ];
 
 
   feedback.textContent =
@@ -902,14 +1020,6 @@ function startNewGame() {
 
   feedback.className =
     "feedback wait";
-
-
-  directionElement.textContent =
-    "TENGAH";
-
-
-  playerStatus.textContent =
-    "🧍 Berdiri di tengah";
 
 
   showQuestion();
@@ -921,9 +1031,9 @@ function startNewGame() {
 }
 
 
-// ======================================================
-// SHOW QUESTION
-// ======================================================
+/* ======================================================
+   SHOW QUESTION
+====================================================== */
 
 function showQuestion() {
 
@@ -939,9 +1049,14 @@ function showQuestion() {
   }
 
 
-  answerLocked = false;
+  answerLocked =
+    false;
 
-  waitingForCenter = false;
+  waitingForCenter =
+    false;
+
+
+  resetPositionTracking();
 
 
   const item =
@@ -972,7 +1087,9 @@ function showQuestion() {
 
 
   progressPercent.textContent =
-    `${Math.round(percentage)}%`;
+    `${Math.round(
+      percentage
+    )}%`;
 
 
   feedback.textContent =
@@ -993,9 +1110,9 @@ function showQuestion() {
 }
 
 
-// ======================================================
-// HANDLE ANSWER
-// ======================================================
+/* ======================================================
+   HANDLE ANSWER
+====================================================== */
 
 function handleAnswer(userAnswer) {
 
@@ -1020,11 +1137,13 @@ function handleAnswer(userAnswer) {
     ];
 
 
-  answerLocked = true;
+  answerLocked =
+    true;
 
 
   const isCorrect =
-    userAnswer === item.answer;
+    userAnswer ===
+    item.answer;
 
 
   if (isCorrect) {
@@ -1060,7 +1179,8 @@ function handleAnswer(userAnswer) {
   }
 
 
-  waitingForCenter = true;
+  waitingForCenter =
+    true;
 
 
   playerStatus.textContent =
@@ -1073,9 +1193,9 @@ function handleAnswer(userAnswer) {
 }
 
 
-// ======================================================
-// NEXT QUESTION
-// ======================================================
+/* ======================================================
+   NEXT QUESTION
+====================================================== */
 
 function nextQuestion() {
 
@@ -1099,72 +1219,282 @@ function nextQuestion() {
 }
 
 
-// ======================================================
-// DETEKSI ARAH
-// ======================================================
+/* ======================================================
+   GET BODY CENTER
+====================================================== */
 
-function updateDirection(centerX) {
+function getBodyCenter(landmarks) {
 
-  // ----------------------------------------------
-  // Baseline belum tersedia
-  // ----------------------------------------------
+  /*
+    MediaPipe Pose:
 
-  if (baselineX === null) {
+    Bahu:
+    11 = left shoulder
+    12 = right shoulder
 
-    baselineX = centerX;
+    Pinggul:
+    23 = left hip
+    24 = right hip
+  */
 
-    currentDirection =
-      "TENGAH";
+  const leftShoulder =
+    landmarks[11];
 
-    directionElement.textContent =
-      "TENGAH";
+  const rightShoulder =
+    landmarks[12];
 
-    playerStatus.textContent =
-      "🧍 Posisi awal tersimpan";
+  const leftHip =
+    landmarks[23];
+
+  const rightHip =
+    landmarks[24];
+
+
+  const points = [
+    leftShoulder,
+    rightShoulder,
+    leftHip,
+    rightHip
+  ];
+
+
+  /*
+    Pastikan landmark
+    cukup terlihat.
+  */
+
+  const validPoints =
+    points.filter(
+      point =>
+        point &&
+        typeof point.x === "number"
+    );
+
+
+  if (
+    validPoints.length < 2
+  ) {
+
+    return null;
+
+  }
+
+
+  let totalX = 0;
+
+
+  validPoints.forEach(
+    point => {
+
+      totalX += point.x;
+
+    }
+  );
+
+
+  return (
+    totalX /
+    validPoints.length
+  );
+
+}
+
+
+/* ======================================================
+   SMOOTH POSITION
+====================================================== */
+
+function smoothPosition(x) {
+
+  if (smoothedX === null) {
+
+    smoothedX =
+      x;
+
+    return smoothedX;
+
+  }
+
+
+  smoothedX =
+    smoothedX +
+    (
+      x -
+      smoothedX
+    ) *
+    POSITION_SMOOTHING;
+
+
+  return smoothedX;
+
+}
+
+
+/* ======================================================
+   DETERMINE DIRECTION
+====================================================== */
+
+function getDirection(x) {
+
+  /*
+    Jika mirror aktif,
+    koordinat dibalik agar
+    arah layar tetap sesuai.
+
+    Setelah mirror:
+
+    kiri layar  = KIRI
+    tengah      = TENGAH
+    kanan layar = KANAN
+  */
+
+  const screenX =
+    mirrorEnabled
+      ? 1 - x
+      : x;
+
+
+  /*
+    PEMBAGIAN BARU
+
+    0.00 - 0.36
+    = KIRI
+
+    0.36 - 0.57
+    = TENGAH
+
+    0.57 - 1.00
+    = KANAN
+  */
+
+  if (
+    screenX <
+    LEFT_LIMIT
+  ) {
+
+    return "KIRI";
+
+  }
+
+
+  if (
+    screenX >
+    RIGHT_LIMIT
+  ) {
+
+    return "KANAN";
+
+  }
+
+
+  return "TENGAH";
+
+}
+
+
+/* ======================================================
+   STABILIZE DIRECTION
+====================================================== */
+
+function getStableDirection(
+  newDirection
+) {
+
+  /*
+    Jika sama dengan arah
+    sebelumnya, tambah counter.
+  */
+
+  if (
+    newDirection ===
+    pendingDirection
+  ) {
+
+    pendingDirectionFrames++;
+
+  } else {
+
+    pendingDirection =
+      newDirection;
+
+    pendingDirectionFrames =
+      1;
+
+  }
+
+
+  /*
+    Tunggu beberapa frame
+    sebelum menganggap arah valid.
+  */
+
+  if (
+    pendingDirectionFrames >=
+    DIRECTION_CONFIRM_FRAMES
+  ) {
+
+    return pendingDirection;
+
+  }
+
+
+  return currentDirection;
+
+}
+
+
+/* ======================================================
+   UPDATE DIRECTION
+====================================================== */
+
+function updateDirection(
+  rawCenterX
+) {
+
+  if (
+    typeof rawCenterX !==
+    "number"
+  ) {
 
     return;
 
   }
 
 
-  const movement =
-    centerX - baselineX;
+  /*
+    Haluskan posisi.
+  */
 
-
-  let newDirection =
-    "TENGAH";
+  const smoothX =
+    smoothPosition(
+      rawCenterX
+    );
 
 
   /*
-    movement < -0.08
-    = fisik bergerak ke KANAN
-
-    movement > 0.08
-    = fisik bergerak ke KIRI
+    Tentukan arah.
   */
 
-  if (
-    movement <
-    -MOVEMENT_THRESHOLD
-  ) {
-
-    newDirection =
-      "KANAN";
-
-  } else if (
-    movement >
-    MOVEMENT_THRESHOLD
-  ) {
-
-    newDirection =
-      "KIRI";
-
-  }
+  const detectedDirection =
+    getDirection(
+      smoothX
+    );
 
 
-  // ----------------------------------------------
-  // Update tampilan arah
-  // ----------------------------------------------
+  /*
+    Stabilkan arah.
+  */
+
+  const newDirection =
+    getStableDirection(
+      detectedDirection
+    );
+
+
+  /*
+    Jangan lakukan apa-apa
+    kalau arah belum berubah.
+  */
 
   currentDirection =
     newDirection;
@@ -1174,52 +1504,58 @@ function updateDirection(centerX) {
     newDirection;
 
 
-  // ----------------------------------------------
-  // TENGAH
-  // ----------------------------------------------
+  /* =====================================
+     TENGAH
+  ====================================== */
 
   if (
     newDirection ===
     "TENGAH"
   ) {
 
-    playerStatus.textContent =
-      "🧍 Posisi tengah";
-
-    /*
-      Jika sebelumnya sudah menjawab,
-      pemain harus kembali ke tengah.
-    */
-
-    if (waitingForCenter) {
-
-      waitingForCenter = false;
-
+    if (
+      waitingForCenter
+    ) {
 
       playerStatus.textContent =
-        "🟢 Siap ke soal berikutnya";
+        "🟢 Posisi tengah — siap";
 
 
-      setTimeout(() => {
+      waitingForCenter =
+        false;
 
-        if (gameRunning) {
 
-          nextQuestion();
+      setTimeout(
+        () => {
 
-        }
+          if (
+            gameRunning
+          ) {
 
-      }, 350);
+            nextQuestion();
+
+          }
+
+        },
+        350
+      );
+
+    } else {
+
+      playerStatus.textContent =
+        "🧍 Posisi tengah";
 
     }
+
 
     return;
 
   }
 
 
-  // ----------------------------------------------
-  // Jika jawaban sedang dikunci
-  // ----------------------------------------------
+  /* =====================================
+     JAWABAN SUDAH DIKUNCI
+  ====================================== */
 
   if (
     answerLocked
@@ -1230,9 +1566,9 @@ function updateDirection(centerX) {
   }
 
 
-  // ----------------------------------------------
-  // KANAN = BENAR
-  // ----------------------------------------------
+  /* =====================================
+     KANAN = BENAR
+  ====================================== */
 
   if (
     newDirection ===
@@ -1242,16 +1578,20 @@ function updateDirection(centerX) {
     playerStatus.textContent =
       "👉 KANAN = BENAR";
 
-    handleAnswer(true);
+
+    handleAnswer(
+      true
+    );
+
 
     return;
 
   }
 
 
-  // ----------------------------------------------
-  // KIRI = SALAH
-  // ----------------------------------------------
+  /* =====================================
+     KIRI = SALAH
+  ====================================== */
 
   if (
     newDirection ===
@@ -1261,18 +1601,23 @@ function updateDirection(centerX) {
     playerStatus.textContent =
       "👈 KIRI = SALAH";
 
-    handleAnswer(false);
+
+    handleAnswer(
+      false
+    );
 
   }
 
 }
 
 
-// ======================================================
-// DETECTION LOOP
-// ======================================================
+/* ======================================================
+   DETECTION LOOP
+====================================================== */
 
-function detectPose(timestamp) {
+function detectPose(
+  timestamp
+) {
 
   if (
     !poseLandmarker ||
@@ -1290,7 +1635,7 @@ function detectPose(timestamp) {
 
   /*
     Batasi frekuensi deteksi
-    agar tidak terlalu berat.
+    supaya tidak terlalu berat.
   */
 
   if (
@@ -1308,7 +1653,9 @@ function detectPose(timestamp) {
   }
 
 
-  if (detectionBusy) {
+  if (
+    detectionBusy
+  ) {
 
     requestAnimationFrame(
       detectPose
@@ -1337,16 +1684,18 @@ function detectPose(timestamp) {
     timestamp;
 
 
-  detectionBusy = true;
+  detectionBusy =
+    true;
 
 
   try {
 
     const result =
-      poseLandmarker.detectForVideo(
-        video,
-        timestamp
-      );
+      poseLandmarker
+        .detectForVideo(
+          video,
+          timestamp
+        );
 
 
     if (
@@ -1359,32 +1708,18 @@ function detectPose(timestamp) {
         result.landmarks[0];
 
 
-      const leftHip =
-        landmarks[23];
-
-
-      const rightHip =
-        landmarks[24];
+      const centerX =
+        getBodyCenter(
+          landmarks
+        );
 
 
       if (
-        leftHip &&
-        rightHip
+        centerX !== null
       ) {
 
-        const centerX =
-          (
-            leftHip.x +
-            rightHip.x
-          ) / 2;
-
-
         updateDirection(
-          // CSS mirror hanya mengubah tampilan. Balik koordinat
-          // agar arah gerak game tetap sama dengan layar.
-          mirrorEnabled
-            ? 1 - centerX
-            : centerX
+          centerX
         );
 
       }
@@ -1401,7 +1736,8 @@ function detectPose(timestamp) {
   }
 
 
-  detectionBusy = false;
+  detectionBusy =
+    false;
 
 
   requestAnimationFrame(
@@ -1411,17 +1747,20 @@ function detectPose(timestamp) {
 }
 
 
-// ======================================================
-// END GAME
-// ======================================================
+/* ======================================================
+   END GAME
+====================================================== */
 
 function endGame() {
 
-  gameRunning = false;
+  gameRunning =
+    false;
 
-  answerLocked = true;
+  answerLocked =
+    true;
 
-  waitingForCenter = false;
+  waitingForCenter =
+    false;
 
 
   progressBar.style.width =
@@ -1466,9 +1805,9 @@ function endGame() {
 }
 
 
-// ======================================================
-// STOP CAMERA
-// ======================================================
+/* ======================================================
+   STOP CAMERA
+====================================================== */
 
 function stopCamera() {
 
@@ -1480,23 +1819,30 @@ function stopCamera() {
         track.stop();
       });
 
-    stream = null;
+
+    stream =
+      null;
 
   }
 
 
-  video.srcObject = null;
+  video.srcObject =
+    null;
 
-  cameraReady = false;
 
-  switchCamera.disabled = false;
+  cameraReady =
+    false;
+
+
+  switchCamera.disabled =
+    false;
 
 }
 
 
-// ======================================================
-// START GAME BUTTON
-// ======================================================
+/* ======================================================
+   START GAME
+====================================================== */
 
 startGame.addEventListener(
   "click",
@@ -1511,7 +1857,8 @@ startGame.addEventListener(
     }
 
 
-    startGame.disabled = true;
+    startGame.disabled =
+      true;
 
 
     menuScreen.classList.remove(
@@ -1525,7 +1872,7 @@ startGame.addEventListener(
 
 
     /*
-      Pastikan MediaPipe sudah siap.
+      MediaPipe.
     */
 
     if (!poseLandmarker) {
@@ -1540,11 +1887,15 @@ startGame.addEventListener(
           "active"
         );
 
+
         menuScreen.classList.add(
           "active"
         );
 
-        startGame.disabled = false;
+
+        startGame.disabled =
+          false;
+
 
         return;
 
@@ -1554,7 +1905,7 @@ startGame.addEventListener(
 
 
     /*
-      Aktifkan kamera.
+      Kamera.
     */
 
     const cameraStarted =
@@ -1567,11 +1918,15 @@ startGame.addEventListener(
         "active"
       );
 
+
       menuScreen.classList.add(
         "active"
       );
 
-      startGame.disabled = false;
+
+      startGame.disabled =
+        false;
+
 
       return;
 
@@ -1579,7 +1934,7 @@ startGame.addEventListener(
 
 
     /*
-      Jalankan detection loop.
+      Detection loop.
     */
 
     requestAnimationFrame(
@@ -1601,15 +1956,16 @@ startGame.addEventListener(
     startNewGame();
 
 
-    startGame.disabled = false;
+    startGame.disabled =
+      false;
 
   }
 );
 
 
-// ======================================================
-// MAIN LAGI
-// ======================================================
+/* ======================================================
+   MAIN LAGI
+====================================================== */
 
 playAgain.addEventListener(
   "click",
@@ -1625,24 +1981,15 @@ playAgain.addEventListener(
     );
 
 
-    /*
-      Reset baseline agar
-      posisi awal pemain yang baru
-      menjadi titik tengah.
-    */
-
-    baselineX = null;
+    resetPositionTracking();
 
 
-    answerLocked = false;
+    answerLocked =
+      false;
 
-    waitingForCenter = false;
+    waitingForCenter =
+      false;
 
-
-    /*
-      Jika kamera belum aktif,
-      buka kembali.
-    */
 
     if (!cameraReady) {
 
@@ -1656,9 +2003,11 @@ playAgain.addEventListener(
           "active"
         );
 
+
         resultScreen.classList.add(
           "active"
         );
+
 
         return;
 
@@ -1676,15 +2025,16 @@ playAgain.addEventListener(
 );
 
 
-// ======================================================
-// KEMBALI KE MENU
-// ======================================================
+/* ======================================================
+   KEMBALI KE MENU
+====================================================== */
 
 backMenu.addEventListener(
   "click",
   () => {
 
-    gameRunning = false;
+    gameRunning =
+      false;
 
 
     resultScreen.classList.remove(
@@ -1702,37 +2052,41 @@ backMenu.addEventListener(
     );
 
 
-    selectedMaterialType = null;
+    selectedMaterialType =
+      null;
 
 
     selectedMaterial.textContent =
       "Belum memilih materi";
 
 
-    materialButtons.forEach(button => {
+    materialButtons.forEach(
+      button => {
 
-      button.classList.remove(
-        "selected"
-      );
+        button.classList.remove(
+          "selected"
+        );
 
-    });
+      }
+    );
 
 
-    startGame.disabled = true;
+    startGame.disabled =
+      true;
 
 
     stopCamera();
 
 
-    baselineX = null;
+    resetPositionTracking();
 
   }
 );
 
 
-// ======================================================
-// INITIAL STATE
-// ======================================================
+/* ======================================================
+   INITIAL STATE
+====================================================== */
 
 statusElement.textContent =
   "Sistem siap";
@@ -1749,9 +2103,9 @@ playerStatus.textContent =
 updateCameraControls();
 
 
-// ======================================================
-// LOAD MEDIAPIPE SAAT HALAMAN DIBUKA
-// ======================================================
+/* ======================================================
+   LOAD MEDIAPIPE
+====================================================== */
 
 (async function initialize() {
 
@@ -1770,6 +2124,7 @@ updateCameraControls();
   } catch (error) {
 
     console.error(error);
+
 
     statusElement.textContent =
       "❌ Sistem gagal dimuat";
