@@ -623,7 +623,11 @@ body {
 }
 
 
-/* Balik output preview dari perangkat agar tampil tidak mirror. */
+/*
+  PENTING:
+  Tidak ada transform: scaleX(-1)
+  supaya video tidak sengaja menjadi mirror.
+*/
 
 #video {
   display: block;
@@ -633,8 +637,6 @@ body {
   height: auto;
 
   object-fit: cover;
-
-  transform: scaleX(-1);
 
   background: black;
 }

@@ -429,10 +429,6 @@ let baselineX = null;
 
 let currentDirection = "TENGAH";
 
-// Sebagian kamera depan mengirim preview yang sudah mirror.
-// Normalisasi koordinat ini membuat arah game tetap sesuai tampilan pemain.
-const CAMERA_PREVIEW_IS_MIRRORED = true;
-
 
 // Interval deteksi.
 // 125 ms = sekitar 8 deteksi per detik.
@@ -547,8 +543,7 @@ async function startCamera() {
         video: {
 
           facingMode: {
-            // Gunakan kamera belakang agar tampilan tidak seperti selfie mirror.
-            ideal: "environment"
+            ideal: "user"
           },
 
           width: {
@@ -1015,9 +1010,11 @@ function updateDirection(centerX) {
 
 
   /*
-    Koordinat sudah dinormalisasi agar arah sesuai tampilan pemain:
-    movement < -0.08 = bergerak ke KIRI
-    movement > 0.08 = bergerak ke KANAN
+    movement < -0.08
+    = fisik bergerak ke KANAN
+
+    movement > 0.08
+    = fisik bergerak ke KIRI
   */
 
   if (
@@ -1026,7 +1023,7 @@ function updateDirection(centerX) {
   ) {
 
     newDirection =
-      "KIRI";
+      "KANAN";
 
   } else if (
     movement >
@@ -1034,7 +1031,7 @@ function updateDirection(centerX) {
   ) {
 
     newDirection =
-      "KANAN";
+      "KIRI";
 
   }
 
@@ -1249,17 +1246,11 @@ function detectPose(timestamp) {
         rightHip
       ) {
 
-        const detectedCenterX =
+        const centerX =
           (
             leftHip.x +
             rightHip.x
           ) / 2;
-
-
-        const centerX =
-          CAMERA_PREVIEW_IS_MIRRORED
-            ? 1 - detectedCenterX
-            : detectedCenterX;
 
 
         updateDirection(
