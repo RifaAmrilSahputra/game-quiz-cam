@@ -602,6 +602,56 @@ body {
    CAMERA
 ========================================= */
 
+.camera-controls {
+  width: 100%;
+
+  max-width: 700px;
+
+  display: flex;
+
+  justify-content: flex-end;
+
+  gap: 10px;
+
+  margin-bottom: 10px;
+}
+
+
+.camera-control-btn {
+  border: 1px solid rgba(255,255,255,0.16);
+
+  border-radius: 12px;
+
+  padding: 9px 12px;
+
+  background: rgba(255,255,255,0.08);
+
+  color: white;
+
+  font-size: 12px;
+
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition: 0.2s ease;
+}
+
+
+.camera-control-btn:hover:not(:disabled),
+.camera-control-btn.active {
+  background: rgba(79,140,255,0.28);
+
+  border-color: rgba(79,140,255,0.8);
+}
+
+
+.camera-control-btn:disabled {
+  opacity: 0.55;
+
+  cursor: wait;
+}
+
 .camera-container {
   position: relative;
 
@@ -623,12 +673,6 @@ body {
 }
 
 
-/*
-  PENTING:
-  Tidak ada transform: scaleX(-1)
-  supaya video tidak sengaja menjadi mirror.
-*/
-
 #video {
   display: block;
 
@@ -639,6 +683,13 @@ body {
   object-fit: cover;
 
   background: black;
+
+  transition: transform 0.2s ease;
+}
+
+
+#video.mirrored {
+  transform: scaleX(-1);
 }
 
 
@@ -975,6 +1026,12 @@ body {
     font-size: 10px;
 
     padding: 7px 8px;
+  }
+
+  .camera-controls {
+    justify-content: center;
+
+    flex-wrap: wrap;
   }
 
   .result-card {

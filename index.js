@@ -78,6 +78,14 @@ const canvas =
   document.getElementById("canvas");
 
 
+const switchCamera =
+  document.getElementById("switchCamera");
+
+
+const toggleMirror =
+  document.getElementById("toggleMirror");
+
+
 const countdown =
   document.getElementById("countdown");
 
@@ -420,6 +428,10 @@ let detectionBusy = false;
 
 let lastDetectionTime = 0;
 
+let facingMode = "user";
+
+let mirrorEnabled = true;
+
 
 // ======================================================
 // MOVEMENT STATE
@@ -537,13 +549,30 @@ async function startCamera() {
     }
 
 
+    // Hentikan stream lama sebelum meminta kamera yang lain.
+    if (stream) {
+
+      stream
+        .getTracks()
+        .forEach(track => {
+          track.stop();
+        });
+
+      stream = null;
+
+    }
+
+
+    cameraReady = false;
+
+
     stream =
       await navigator.mediaDevices.getUserMedia({
 
         video: {
 
           facingMode: {
-            ideal: "user"
+            ideal: facingMode
           },
 
           width: {
@@ -568,6 +597,9 @@ async function startCamera() {
 
 
     cameraReady = true;
+
+
+    updateCameraControls();
 
 
     statusElement.textContent =
@@ -599,6 +631,100 @@ async function startCamera() {
   }
 
 }
+
+
+// ======================================================
+// CAMERA CONTROLS
+// ======================================================
+
+function updateCameraControls() {
+
+  const isFrontCamera =
+    facingMode === "user";
+
+
+  switchCamera.textContent =
+    isFrontCamera
+      ? "🔄 Kamera: Depan"
+      : "🔄 Kamera: Belakang";
+
+
+  toggleMirror.textContent =
+    mirrorEnabled
+      ? "🪞 Mirror: Aktif"
+      : "🪞 Mirror: Nonaktif";
+
+
+  toggleMirror.classList.toggle(
+    "active",
+    mirrorEnabled
+  );
+
+
+  toggleMirror.setAttribute(
+    "aria-pressed",
+    String(mirrorEnabled)
+  );
+
+
+  video.classList.toggle(
+    "mirrored",
+    mirrorEnabled
+  );
+
+}
+
+
+switchCamera.addEventListener(
+  "click",
+  async () => {
+
+    if (!cameraReady) {
+      return;
+    }
+
+
+    facingMode =
+      facingMode === "user"
+        ? "environment"
+        : "user";
+
+
+    // Titik tengah perlu dibuat ulang setelah sumber kamera berubah.
+    baselineX = null;
+
+
+    switchCamera.disabled = true;
+
+
+    const started =
+      await startCamera();
+
+
+    switchCamera.disabled = false;
+
+
+    if (!started) {
+
+      statusElement.textContent =
+        "❌ Gagal mengganti kamera";
+
+    }
+
+  }
+);
+
+
+toggleMirror.addEventListener(
+  "click",
+  () => {
+
+    mirrorEnabled = !mirrorEnabled;
+
+    updateCameraControls();
+
+  }
+);
 
 
 // ======================================================
@@ -1254,7 +1380,11 @@ function detectPose(timestamp) {
 
 
         updateDirection(
-          centerX
+          // CSS mirror hanya mengubah tampilan. Balik koordinat
+          // agar arah gerak game tetap sama dengan layar.
+          mirrorEnabled
+            ? 1 - centerX
+            : centerX
         );
 
       }
@@ -1358,6 +1488,8 @@ function stopCamera() {
   video.srcObject = null;
 
   cameraReady = false;
+
+  switchCamera.disabled = false;
 
 }
 
@@ -1612,6 +1744,9 @@ directionElement.textContent =
 
 playerStatus.textContent =
   "🧍 Berdiri di tengah";
+
+
+updateCameraControls();
 
 
 // ======================================================
