@@ -1,13 +1,14 @@
 <!DOCTYPE html>
+
 <html lang="id">
 
 <head>
   <meta charset="UTF-8" />
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  />
+<meta
+ name="viewport"
+ content="width=device-width, initial-scale=1.0"
+/>
 
   <title>Game Edukasi</title>
 
@@ -21,466 +22,438 @@
 
   <div class="app">
 
-    <!-- =====================================
-         MENU
-    ====================================== -->
+<!-- =====================================
+     MENU
+====================================== -->
 
-    <section
-      id="menuScreen"
-      class="screen active"
+<section
+  id="menuScreen"
+  class="screen active"
+>
+
+  <div class="logo">
+    🧠
+  </div>
+
+  <h1>
+    GAME EDUKASI
+  </h1>
+
+  <p class="subtitle">
+    Kuis Gerakan Tubuh
+  </p>
+
+  <div class="menu-card">
+
+    <h2>
+      Pilih Materi
+    </h2>
+
+    <button
+      class="material-btn"
+      data-material="pencernaan"
+      type="button"
     >
 
-      <div class="logo">
-        🧠
-      </div>
+      <span class="material-icon">
+        🍽️
+      </span>
 
-      <h1>
-        GAME EDUKASI
-      </h1>
+      <span class="material-text">
 
-      <p class="subtitle">
-        Kuis Gerakan Tubuh
-      </p>
-
-
-      <div class="menu-card">
-
-        <h2>
-          Pilih Materi
-        </h2>
-
-
-        <button
-          class="material-btn"
-          data-material="pencernaan"
-          type="button"
-        >
-
-          <span class="material-icon">
-            🍽️
-          </span>
-
-          <span class="material-text">
-
-            <strong>
-              Sistem Pencernaan
-            </strong>
-
-            <small>
-              20 soal
-            </small>
-
-          </span>
-
-          <span class="check">
-            ✓
-          </span>
-
-        </button>
-
-
-        <button
-          class="material-btn"
-          data-material="peredaran"
-          type="button"
-        >
-
-          <span class="material-icon">
-            ❤️
-          </span>
-
-          <span class="material-text">
-
-            <strong>
-              Sistem Peredaran Darah
-            </strong>
-
-            <small>
-              20 soal
-            </small>
-
-          </span>
-
-          <span class="check">
-            ✓
-          </span>
-
-        </button>
-
-
-        <div
-          id="selectedMaterial"
-          class="selected-material"
-        >
-          Belum memilih materi
-        </div>
-
-
-        <button
-          id="startGame"
-          class="main-btn"
-          type="button"
-          disabled
-        >
-          📷 MULAI GAME
-        </button>
-
-      </div>
-
-    </section>
-
-
-    <!-- =====================================
-         GAME
-    ====================================== -->
-
-    <section
-      id="gameScreen"
-      class="screen"
-    >
-
-      <!-- COUNTDOWN -->
-
-      <div
-        id="countdown"
-        class="countdown"
-      >
-
-        <div id="countdownNumber">
-          3
-        </div>
-
-      </div>
-
-
-      <!-- HEADER -->
-
-      <header class="game-header">
-
-        <div class="header-left">
-
-          <div class="game-label">
-            🎮 GAME EDUKASI
-          </div>
-
-          <h1 id="materialTitle">
-            Kuis
-          </h1>
-
-        </div>
-
-
-        <div class="score-box">
-
-          <span>
-            SKOR
-          </span>
-
-          <strong id="score">
-            0
-          </strong>
-
-        </div>
-
-      </header>
-
-
-      <!-- PROGRESS -->
-
-      <div class="progress-wrapper">
-
-        <div class="progress-text">
-
-          <span id="questionNumber">
-            SOAL 1 / 10
-          </span>
-
-          <span id="progressPercent">
-            0%
-          </span>
-
-        </div>
-
-
-        <div class="progress">
-
-          <div id="progressBar"></div>
-
-        </div>
-
-      </div>
-
-
-      <!-- QUESTION -->
-
-      <div class="question-card">
-
-        <div class="question-label">
-          PERTANYAAN
-        </div>
-
-
-        <div id="question">
-          Memuat soal...
-        </div>
-
-
-        <div
-          id="feedback"
-          class="feedback"
-        >
-          Bersiap...
-        </div>
-
-      </div>
-
-
-      <!-- INSTRUCTION -->
-
-      <div class="instruction">
-
-        <div class="answer-card wrong">
-
-          <span class="answer-icon">
-            👈
-          </span>
-
-          <div>
-
-            <strong>
-              SALAH
-            </strong>
-
-            <small>
-              Gerak ke kiri
-            </small>
-
-          </div>
-
-        </div>
-
-
-        <div class="answer-card correct">
-
-          <span class="answer-icon">
-            👉
-          </span>
-
-          <div>
-
-            <strong>
-              BENAR
-            </strong>
-
-            <small>
-              Gerak ke kanan
-            </small>
-
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <!-- CAMERA CONTROLS -->
-
-      <div
-        class="camera-controls"
-        aria-label="Pengaturan kamera"
-      >
-
-        <button
-          id="switchCamera"
-          class="camera-control-btn"
-          type="button"
-        >
-          🔄 Kamera: Depan
-        </button>
-
-
-        <button
-          id="toggleMirror"
-          class="camera-control-btn active"
-          type="button"
-          aria-pressed="true"
-        >
-          🪞 Mirror: Aktif
-        </button>
-
-      </div>
-
-
-      <!-- CAMERA -->
-
-      <div class="camera-container">
-
-        <video
-          id="video"
-          autoplay
-          playsinline
-          muted
-        ></video>
-
-
-        <canvas id="canvas"></canvas>
-
-
-        <div class="camera-title">
-          GERAKKAN TUBUH
-        </div>
-
-
-        <!-- VISUAL ZONE -->
-
-        <div class="zone-guide left-guide">
-          👈 SALAH
-        </div>
-
-
-        <div class="zone-guide center-guide">
-          🧍 TENGAH
-        </div>
-
-
-        <div class="zone-guide right-guide">
-          BENAR 👉
-        </div>
-
-
-        <!-- GARIS BATAS -->
-
-        <div class="zone-line line-left"></div>
-
-        <div class="zone-line line-right"></div>
-
-      </div>
-
-
-      <!-- DIRECTION -->
-
-      <div
-        id="direction"
-        class="direction"
-      >
-        TENGAH
-      </div>
-
-
-      <!-- PLAYER STATUS -->
-
-      <div
-        id="playerStatus"
-        class="player-status"
-      >
-        🧍 Berdiri di tengah
-      </div>
-
-
-      <!-- SYSTEM STATUS -->
-
-      <div
-        id="status"
-        class="status"
-      >
-        Memuat sistem...
-      </div>
-
-    </section>
-
-
-    <!-- =====================================
-         RESULT
-    ====================================== -->
-
-    <section
-      id="resultScreen"
-      class="screen"
-    >
-
-      <div class="result-card">
-
-        <div class="result-icon">
-          🏆
-        </div>
-
-
-        <h1>
-          GAME SELESAI!
-        </h1>
-
-
-        <p id="resultMaterial">
+        <strong>
           Sistem Pencernaan
-        </p>
+        </strong>
 
+        <small>
+          20 soal
+        </small>
 
-        <div class="final-score">
+      </span>
 
-          <span>
-            SKOR AKHIR
-          </span>
+      <span class="check">
+        ✓
+      </span>
 
-          <strong id="finalScore">
-            0
-          </strong>
+    </button>
 
-        </div>
+    <button
+      class="material-btn"
+      data-material="peredaran"
+      type="button"
+    >
 
+      <span class="material-icon">
+        ❤️
+      </span>
 
-        <div class="result-info">
+      <span class="material-text">
 
-          <div>
+        <strong>
+          Sistem Peredaran Darah
+        </strong>
 
-            <span>
-              Benar
-            </span>
+        <small>
+          20 soal
+        </small>
 
-            <strong id="correctCount">
-              0
-            </strong>
+      </span>
 
-          </div>
+      <span class="check">
+        ✓
+      </span>
 
+    </button>
 
-          <div>
+    <div
+      id="selectedMaterial"
+      class="selected-material"
+    >
+      Belum memilih materi
+    </div>
 
-            <span>
-              Salah
-            </span>
-
-            <strong id="wrongCount">
-              0
-            </strong>
-
-          </div>
-
-        </div>
-
-
-        <button
-          id="playAgain"
-          class="main-btn"
-          type="button"
-        >
-          🔄 MAIN LAGI
-        </button>
-
-
-        <button
-          id="backMenu"
-          class="secondary-btn"
-          type="button"
-        >
-          🏠 KEMBALI KE MENU
-        </button>
-
-      </div>
-
-    </section>
+    <button
+      id="startGame"
+      class="main-btn"
+      type="button"
+      disabled
+    >
+      📷 MULAI GAME
+    </button>
 
   </div>
 
+</section>
+
+
+<!-- =====================================
+     GAME
+====================================== -->
+
+<section
+  id="gameScreen"
+  class="screen"
+>
+
+  <!-- COUNTDOWN -->
+
+  <div
+    id="countdown"
+    class="countdown"
+  >
+
+    <div id="countdownNumber">
+      3
+    </div>
+
+  </div>
+
+
+  <!-- HEADER -->
+
+  <header class="game-header">
+
+    <div class="header-left">
+
+      <div class="game-label">
+        🎮 GAME EDUKASI
+      </div>
+
+      <h1 id="materialTitle">
+        Kuis
+      </h1>
+
+    </div>
+
+    <div class="score-box">
+
+      <span>
+        SKOR
+      </span>
+
+      <strong id="score">
+        0
+      </strong>
+
+    </div>
+
+  </header>
+
+
+  <!-- PROGRESS -->
+
+  <div class="progress-wrapper">
+
+    <div class="progress-text">
+
+      <span id="questionNumber">
+        SOAL 1 / 10
+      </span>
+
+      <span id="progressPercent">
+        0%
+      </span>
+
+    </div>
+
+    <div class="progress">
+
+      <div id="progressBar"></div>
+
+    </div>
+
+  </div>
+
+
+  <!-- QUESTION -->
+
+  <div class="question-card">
+
+    <div class="question-label">
+      PERTANYAAN
+    </div>
+
+    <div id="question">
+      Memuat soal...
+    </div>
+
+    <div
+      id="feedback"
+      class="feedback"
+    >
+      Bersiap...
+    </div>
+
+  </div>
+
+
+  <!-- INSTRUCTION -->
+
+  <div class="instruction">
+
+    <div class="answer-card wrong">
+
+      <span class="answer-icon">
+        👈
+      </span>
+
+      <div>
+
+        <strong>
+          SALAH
+        </strong>
+
+        <small>
+          Gerak ke kiri
+        </small>
+
+      </div>
+
+    </div>
+
+
+    <div class="answer-card correct">
+
+      <span class="answer-icon">
+        👉
+      </span>
+
+      <div>
+
+        <strong>
+          BENAR
+        </strong>
+
+        <small>
+          Gerak ke kanan
+        </small>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- CAMERA CONTROLS -->
+
+  <div
+    class="camera-controls"
+    aria-label="Pengaturan kamera"
+  >
+
+    <button
+      id="switchCamera"
+      class="camera-control-btn"
+      type="button"
+    >
+      🔄 Kamera: Depan
+    </button>
+
+    <button
+      id="toggleMirror"
+      class="camera-control-btn active"
+      type="button"
+      aria-pressed="true"
+    >
+      🪞 Mirror: Aktif
+    </button>
+
+  </div>
+
+
+  <!-- CAMERA -->
+
+  <div class="camera-container">
+
+    <video
+      id="video"
+      autoplay
+      playsinline
+      muted
+    ></video>
+
+    <canvas id="canvas"></canvas>
+
+    <div class="camera-title">
+      GERAKKAN TUBUH
+    </div>
+
+    <div class="zone-guide left-guide">
+      👈 SALAH
+    </div>
+
+    <div class="zone-guide center-guide">
+      🧍 TENGAH
+    </div>
+
+    <div class="zone-guide right-guide">
+      BENAR 👉
+    </div>
+
+    <div class="zone-line line-left"></div>
+
+    <div class="zone-line line-right"></div>
+
+  </div>
+
+
+  <!-- DIRECTION -->
+
+  <div
+    id="direction"
+    class="direction"
+  >
+    TENGAH
+  </div>
+
+
+  <!-- PLAYER STATUS -->
+
+  <div
+    id="playerStatus"
+    class="player-status"
+  >
+    🧍 Berdiri di tengah
+  </div>
+
+
+  <!-- SYSTEM STATUS -->
+
+  <div
+    id="status"
+    class="status"
+  >
+    Memuat sistem...
+  </div>
+
+</section>
+
+
+<!-- =====================================
+     RESULT
+====================================== -->
+
+<section
+  id="resultScreen"
+  class="screen"
+>
+
+  <div class="result-card">
+
+    <div class="result-icon">
+      🏆
+    </div>
+
+    <h1>
+      GAME SELESAI!
+    </h1>
+
+    <p id="resultMaterial">
+      Sistem Pencernaan
+    </p>
+
+    <div class="final-score">
+
+      <span>
+        SKOR AKHIR
+      </span>
+
+      <strong id="finalScore">
+        0
+      </strong>
+
+    </div>
+
+    <div class="result-info">
+
+      <div>
+
+        <span>
+          Benar
+        </span>
+
+        <strong id="correctCount">
+          0
+        </strong>
+
+      </div>
+
+      <div>
+
+        <span>
+          Salah
+        </span>
+
+        <strong id="wrongCount">
+          0
+        </strong>
+
+      </div>
+
+    </div>
+
+    <button
+      id="playAgain"
+      class="main-btn"
+      type="button"
+    >
+      🔄 MAIN LAGI
+    </button>
+
+    <button
+      id="backMenu"
+      class="secondary-btn"
+      type="button"
+    >
+      🏠 KEMBALI KE MENU
+    </button>
+
+  </div>
+
+</section>
+
+  </div>
 
   <script
     type="module"
@@ -490,4 +463,3 @@
 </body>
 
 </html>
-```
